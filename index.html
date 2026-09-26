@@ -21,13 +21,13 @@ a.dl{display:none;margin-top:12px;padding:12px;border-radius:8px;background:#22c
 select{background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;padding:6px}
 .est{margin-top:10px;padding:10px;border-radius:8px;background:#312e81;display:none}
 .est b.down{color:#22c55e;font-size:18px}
-.msg{margin-top:10px;color:#94a3b8}
+.msg{margin-top:10px;color:#94a3b8;white-space:pre-wrap}
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>📦 ファイル＆動画圧縮</h1>
-<p class="sub">ブラウザの中だけで圧縮します</p>
+<p class="sub">長さを保ったまま、設定した画質で圧縮します</p>
 <div class="tab"><button class="on" id="t1">ZIP</button><button id="t2">動画</button></div>
 <div class="card">
 <div id="p1">
@@ -41,10 +41,10 @@ select{background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;
 <div id="p2" style="display:none">
 <div class="drop" id="vdrop">動画をタップして選ぶ</div>
 <input id="vin" type="file" accept="video/*,*/*" hidden>
-<video id="vp" muted playsinline controls style="width:100%;display:none;margin-top:8px;background:#000"></video>
+<video id="vp" playsinline controls style="width:100%;display:none;margin-top:8px;background:#000"></video>
 <p>
-解像度 <select id="vres"><option value="orig">元</option><option value="1080">1080p</option><option value="720" selected>720p</option><option value="480">480p</option><option value="360">360p</option></select>
-画質 <select id="vq"><option value="high">高</option><option value="medium" selected>標準</option><option value="low">軽量</option></select>
+解像度 <select id="vres"><option value="orig" selected>元のまま</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option></select>
+画質 <select id="vq"><option value="high" selected>高画質</option><option value="medium">標準</option><option value="low">軽量</option></select>
 </p>
 <div class="est" id="vest"></div>
 <button class="main" id="vbtn" disabled>動画を圧縮</button>
@@ -89,15 +89,39 @@ function updZ(){
   const to=zfiles.reduce((s,f)=>s+f.size*zRatio(f.name,lv),0)+64;
   showEst('zest',from,to);
 }
-function sizeWH(w,h,mode){ if(mode==='orig'||h<=+mode) return {w,h}; const r=+mode/h; return {w:Math.max(2,Math.round(w*r/2)*2),h:Math.max(2,Math.round(+mode/2)*2)}; }
+function sizeWH(w,h,mode){
+  if(!w||!h) return {w:640,h:360};
+  if(mode==='orig'||h<=+mode) return {w:w-(w%2),h:h-(h%2)};
+  const r=+mode/h;
+  return {w:Math.max(2,Math.round(w*r/2)*2),h:Math.max(2,Math.round(+mode/2)*2)};
+}
+function bitsFor(w,h,q){
+  const base=(w*h)/(1280*720);
+  const map={high:6.0,medium:2.6,low:1.2};
+  return Math.round(Math.max(0.8,Math.min(20,base*map[q]*2.4))*1e6);
+}
 function updV(){
   if(!vfile||!vmeta.w){ $('vest').style.display='none'; return; }
   const s=sizeWH(vmeta.w,vmeta.h,$('vres').value);
-  const q=$('vq').value;
-  const bits=Math.max(.25,Math.min(12,(s.w*s.h)/(1280*720)*({high:2.4,medium:1.3,low:.7}[q])*2.2))*1e6;
+  const bits=bitsFor(s.w,s.h,$('vq').value);
   const dur=vmeta.d>0?vmeta.d:10;
-  const to=Math.max(80*1024,((bits+96000)/8)*dur*1.05);
+  const to=Math.max(80*1024,((bits+128000)/8)*dur*1.08);
   showEst('vest',vfile.size,to);
+}
+function pickMime(){
+  const types=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  for(const t of types){ if(window.MediaRecorder&&MediaRecorder.isTypeSupported(t)) return t; }
+  return 'video/webm';
+}
+async function seekStart(v){
+  v.pause();
+  await new Promise(r=>{
+    let done=false;
+    const fin=()=>{ if(done) return; done=true; v.removeEventListener('seeked',fin); r(); };
+    v.addEventListener('seeked',fin);
+    try{ v.currentTime=0; }catch(e){ fin(); }
+    setTimeout(fin,900);
+  });
 }
 $('t1').onclick=()=>{ $('t1').className='on'; $('t2').className=''; $('p1').style.display='block'; $('p2').style.display='none'; };
 $('t2').onclick=()=>{ $('t2').className='on'; $('t1').className=''; $('p2').style.display='block'; $('p1').style.display='none'; };
@@ -112,7 +136,7 @@ $('zin').onchange=()=>{
 $('zbtn').onclick=async()=>{
   say('圧縮しています…');
   try{
-    if(typeof JSZip==='undefined'){ say('ZIP用の部品を読み込めませんでした。再読み込みしてください'); return; }
+    if(typeof JSZip==='undefined'){ say('ZIP用の部品を読み込めませんでした'); return; }
     const zip=new JSZip();
     const from=zfiles.reduce((s,f)=>s+f.size,0);
     zfiles.forEach(f=>zip.file(f.name,f));
@@ -126,36 +150,72 @@ $('vin').onchange=()=>{
   const f=$('vin').files[0]; if(!f) return;
   vfile=f; say(f.name+' を読み込み中…');
   const v=$('vp'); v.src=URL.createObjectURL(f); v.style.display='block';
-  v.onloadedmetadata=()=>{ vmeta={w:v.videoWidth,h:v.videoHeight,d:v.duration||0}; $('vbtn').disabled=false; updV(); say(f.name+' / '+vmeta.w+'x'+vmeta.h+' / '+fmt(f.size)); };
+  v.onloadedmetadata=()=>{
+    vmeta={w:v.videoWidth,h:v.videoHeight,d:v.duration||0};
+    $('vbtn').disabled=false;
+    updV();
+    say(f.name+'\n'+vmeta.w+'x'+vmeta.h+' / '+(vmeta.d?vmeta.d.toFixed(1)+'秒 / ':'')+fmt(f.size));
+  };
   v.onerror=()=>say('この動画は再生できません');
 };
 $('vbtn').onclick=async()=>{
   if(!vfile){ say('先に動画を選んでください'); return; }
   if(!window.MediaRecorder){ say('このブラウザでは動画圧縮できません'); return; }
   const v=$('vp');
-  say('圧縮しています。画面を消さず待ってください…');
+  $('vbtn').disabled=true;
+  say('圧縮しています。終わるまで画面を消さないでください…');
   try{
-    const s=sizeWH(v.videoWidth||vmeta.w,v.videoHeight||vmeta.h,$('vres').value);
+    await seekStart(v);
+    const mode=$('vres').value;
     const q=$('vq').value;
-    const bits=Math.round(Math.max(.25,Math.min(12,(s.w*s.h)/(1280*720)*({high:2.4,medium:1.3,low:.7}[q])*2.2))*1e6);
-    const c=document.createElement('canvas'); c.width=s.w; c.height=s.h;
-    const ctx=c.getContext('2d');
-    const stream=c.captureStream(30);
-    const mime=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'video/webm';
-    const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:bits});
-    const ch=[]; rec.ondataavailable=e=>{ if(e.data&&e.data.size) ch.push(e.data); };
-    const done=new Promise((ok,ng)=>{ rec.onstop=ok; rec.onerror=ev=>ng(ev.error||new Error('rec')); });
-    rec.start(200);
-    v.muted=true; v.currentTime=0;
+    const s=sizeWH(v.videoWidth||vmeta.w,v.videoHeight||vmeta.h,mode);
+    const needScale=mode!=='orig' && (v.videoHeight||vmeta.h)>+mode;
+    const mime=pickMime();
+    const bits=bitsFor(s.w,s.h,q);
+    let recStream; let drawStop=false;
+    if(!needScale && v.captureStream){
+      recStream=v.captureStream();
+    }else{
+      const c=document.createElement('canvas');
+      c.width=s.w; c.height=s.h;
+      const ctx=c.getContext('2d');
+      recStream=c.captureStream();
+      const paint=()=>{
+        if(drawStop) return;
+        if(v.videoWidth) ctx.drawImage(v,0,0,s.w,s.h);
+        if(v.requestVideoFrameCallback) v.requestVideoFrameCallback(paint);
+        else requestAnimationFrame(paint);
+      };
+      if(v.requestVideoFrameCallback) v.requestVideoFrameCallback(paint);
+      else requestAnimationFrame(paint);
+    }
+    const rec=new MediaRecorder(recStream,{mimeType:mime,videoBitsPerSecond:bits});
+    const ch=[];
+    rec.ondataavailable=e=>{ if(e.data&&e.data.size) ch.push(e.data); };
+    const stopped=new Promise((ok,ng)=>{ rec.onstop=ok; rec.onerror=ev=>ng(ev.error||new Error('録画エラー')); });
+    rec.start(100);
+    v.muted=true;
     await v.play();
-    const draw=()=>{ if(v.ended||v.paused) return; ctx.drawImage(v,0,0,s.w,s.h); requestAnimationFrame(draw); };
-    requestAnimationFrame(draw);
-    await new Promise(r=>{ v.onended=r; });
-    ctx.drawImage(v,0,0,s.w,s.h);
-    rec.stop(); await done;
+    const dur=v.duration||vmeta.d||0;
+    await new Promise(resolve=>{
+      const tick=()=>{
+        const t=v.currentTime||0;
+        if(dur) say('圧縮中 '+(Math.min(99,100*t/dur)).toFixed(0)+'%  ('+t.toFixed(1)+' / '+dur.toFixed(1)+'秒)');
+        if(v.ended || (dur && t>=dur-0.05)) resolve();
+        else setTimeout(tick,200);
+      };
+      v.onended=()=>resolve();
+      tick();
+    });
+    await new Promise(r=>setTimeout(r,300));
+    drawStop=true;
+    if(rec.state==='recording') rec.stop();
+    await stopped;
     const blob=new Blob(ch,{type:'video/webm'});
+    if(!blob.size) throw new Error('出力が空でした');
     readyFile(blob, vfile.name.replace(/\.[^.]+$/,'')+'_'+s.h+'p.webm', vfile.size);
   }catch(e){ say('動画失敗: '+(e.message||e)); }
+  finally{ $('vbtn').disabled=!vfile; }
 };
 </script>
 </body>
