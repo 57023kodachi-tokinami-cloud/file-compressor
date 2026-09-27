@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ファイル＆動画圧縮</title>
+<title>ファイル圧縮と便利帖</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <style>
@@ -11,28 +11,39 @@ body{font-family:sans-serif;background:#0f172a;color:#f1f5f9;margin:0;padding:16
 .wrap{max-width:640px;margin:0 auto}
 h1{font-size:22px;margin:0 0 6px}
 .sub{color:#94a3b8;margin:0 0 12px;line-height:1.5}
-.tab{display:flex;gap:8px;margin:12px 0}
-.tab button{flex:1;padding:10px;border:0;border-radius:8px;background:#1e293b;color:#94a3b8}
+.tab{display:flex;gap:6px;margin:12px 0}
+.tab button{flex:1;padding:10px 6px;border:0;border-radius:8px;background:#1e293b;color:#94a3b8;font-size:14px}
 .tab button.on{background:#6366f1;color:#fff}
 .card{background:#1e293b;border-radius:12px;padding:16px}
 .drop{border:2px dashed #334155;border-radius:10px;padding:22px;text-align:center}
-button.main{width:100%;margin-top:12px;padding:12px;border:0;border-radius:8px;background:#6366f1;color:#fff;font-weight:700}
+button.main{width:100%;margin-top:10px;padding:12px;border:0;border-radius:8px;background:#6366f1;color:#fff;font-weight:700}
 button.main:disabled{opacity:.5}
+button.green{background:#22c55e;color:#052e16}
 a.dl{display:none;margin-top:12px;padding:12px;border-radius:8px;background:#22c55e;color:#052e16;text-align:center;text-decoration:none;font-weight:700}
-select{background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;padding:6px}
+select,input,textarea{background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;padding:8px;width:100%;box-sizing:border-box}
+textarea{min-height:120px;margin-top:8px}
 .est{margin-top:10px;padding:10px;border-radius:8px;background:#312e81;display:none}
 .est b.down{color:#22c55e;font-size:18px}
 .msg{margin-top:10px;color:#94a3b8;white-space:pre-wrap}
 .num{display:none;margin-top:12px;text-align:center}
 .num .big{font-size:42px;font-weight:800;color:#a5b4fc}
-.num .sec{margin-top:4px;font-size:16px;color:#e2e8f0}
+.item{background:#0f172a;border-radius:8px;padding:10px;margin-top:8px}
+.item b{display:block}
+.item small{color:#94a3b8}
+.row{display:flex;gap:8px;margin-top:8px}
+.row button{flex:1;border:0;border-radius:6px;padding:8px;background:#334155;color:#fff}
+.warn{font-size:12px;color:#94a3b8;margin-top:8px;line-height:1.5}
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1>📦 ファイル＆動画圧縮</h1>
-<p class="sub">普通の圧縮サイトと同じ方式です。再生はしません。</p>
-<div class="tab"><button class="on" id="t1">ZIP</button><button id="t2">動画</button></div>
+<h1>📦 圧縮＋便利帖</h1>
+<p class="sub">題名をつけてメモを書けます。動画は同じメモに残せます。</p>
+<div class="tab">
+  <button class="on" id="t1">ZIP</button>
+  <button id="t2">動画</button>
+  <button id="t3">メモ</button>
+</div>
 <div class="card">
 <div id="p1">
 <div class="drop" id="zdrop">ファイルをタップして選ぶ</div>
@@ -47,16 +58,21 @@ select{background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;
 <input id="vin" type="file" accept="video/*,*/*" hidden>
 <video id="vp" muted playsinline style="display:none"></video>
 <p id="vinfo"></p>
-<p>
-解像度 <select id="vres"><option value="orig">元のまま</option><option value="1080">1080p</option><option value="720" selected>720p</option><option value="480">480p</option><option value="360">360p</option></select>
-画質 <select id="vq"><option value="high">高画質</option><option value="medium" selected>標準</option><option value="low">軽量</option></select>
-</p>
+<p>解像度 <select id="vres"><option value="orig">元のまま</option><option value="1080">1080p</option><option value="720" selected>720p</option><option value="480">480p</option><option value="360">360p</option></select></p>
+<p>画質 <select id="vq"><option value="high">高画質</option><option value="medium" selected>標準</option><option value="low">軽量</option></select></p>
 <div class="est" id="vest"></div>
 <button class="main" id="vbtn" disabled>動画を圧縮</button>
-<div class="num" id="num">
-  <div class="big" id="numPct">0%</div>
-  <div class="sec" id="numSec">準備中</div>
+<div class="num" id="num"><div class="big" id="numPct">0%</div><div id="numSec">準備中</div></div>
 </div>
+<div id="p3" style="display:none">
+<input id="ntitle" placeholder="題名">
+<textarea id="nbody" placeholder="ここに書く"></textarea>
+<p class="warn">動画はこのスマホのブラウザに残ります。GitHubには置けません。</p>
+<input id="nvid" type="file" accept="video/*" hidden>
+<button class="main" id="npick">動画を付ける</button>
+<p id="nvidname"></p>
+<button class="main green" id="nsave">メモを保存</button>
+<div id="nlist"></div>
 </div>
 <a class="dl" id="dl" href="#">ダウンロード</a>
 <p class="msg" id="msg"></p>
@@ -64,21 +80,12 @@ select{background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;
 </div>
 <script>
 const $=id=>document.getElementById(id);
-let zfiles=[], vfile=null, vmeta={w:0,h:0,d:0}, ready='', ff=null;
+let zfiles=[], vfile=null, vmeta={w:0,h:0,d:0}, ready='', ff=null, noteVid=null;
 function fmt(n){n=Math.max(0,+n||0); if(n<1024)return Math.round(n)+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB';}
-function pctLine(from,to){
-  if(!from) return '';
-  const p=Math.round((1-to/from)*100);
-  const label=p>=1?('-'+p+'%'):(p<=-1?('+'+Math.abs(p)+'%'):'±0%');
-  return '今 '+fmt(from)+' → 予想 '+fmt(to)+'　<b class="down">'+label+'</b>';
-}
-function showEst(id,from,to){ const el=$(id); el.style.display='block'; el.innerHTML=pctLine(from,to); }
 function say(t){ $('msg').textContent=t; }
-function setNum(p,text){
-  $('num').style.display='block';
-  $('numPct').textContent=Math.max(0,Math.min(100,Math.round(p)))+'%';
-  if(text) $('numSec').textContent=text;
-}
+function pctLine(from,to){ const p=Math.round((1-to/from)*100); const label=p>=1?('-'+p+'%'):(p<=-1?('+'+Math.abs(p)+'%'):'±0%'); return '今 '+fmt(from)+' → 予想 '+fmt(to)+'　<b class="down">'+label+'</b>'; }
+function showEst(id,from,to){ const el=$(id); el.style.display='block'; el.innerHTML=pctLine(from,to); }
+function setNum(p,text){ $('num').style.display='block'; $('numPct').textContent=Math.max(0,Math.min(100,Math.round(p)))+'%'; if(text)$('numSec').textContent=text; }
 function readyFile(blob,name,from){
   if(!blob||!blob.size){ say('保存できるデータがありません'); return; }
   if(ready) URL.revokeObjectURL(ready);
@@ -86,124 +93,50 @@ function readyFile(blob,name,from){
   const a=$('dl'); a.href=ready; a.download=name; a.style.display='block'; a.textContent='⬇️ '+name+' を保存';
   const p=from?Math.round((1-blob.size/from)*100):0;
   say('できました '+fmt(from||0)+' → '+fmt(blob.size)+(from?('  ('+(p>=0?'-':'+')+Math.abs(p)+'%)'):''));
+  $('ntitle').value=name.replace(/\.[^.]+$/,'');
+  $('nbody').value='圧縮した動画';
+  noteVid=new File([blob],name,{type:blob.type||'video/mp4'});
+  $('nvidname').textContent='付ける動画: '+name+' ('+fmt(blob.size)+')';
 }
-function zRatio(name,lv){
-  const e=(name.split('.').pop()||'').toLowerCase();
-  const hard='jpg,jpeg,png,gif,webp,mp3,mp4,mov,webm,zip,rar,7z,docx,xlsx,pptx';
-  const text='txt,csv,html,htm,css,js,json,xml,svg,md';
-  const b=lv>=9?0.08:lv>=6?0.04:0;
-  if(hard.split(',').includes(e)) return 0.96;
-  if(text.split(',').includes(e)) return Math.max(0.2,0.42-b);
-  return Math.max(0.45,0.72-b);
+function dbp(){ return new Promise((res,rej)=>{ const r=indexedDB.open('locker',1); r.onupgradeneeded=()=>r.result.createObjectStore('notes',{keyPath:'id'}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function allNotes(){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes').objectStore('notes').getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }); }
+async function putNote(n){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes','readwrite').objectStore('notes').put(n); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); }
+async function delNote(id){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes','readwrite').objectStore('notes').delete(id); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); }
+async function renderNotes(){
+  const list=await allNotes(); list.sort((a,b)=>b.id-a.id);
+  $('nlist').innerHTML=list.length?'':'<p class="warn">まだメモはありません</p>';
+  list.forEach(n=>{
+    const d=document.createElement('div'); d.className='item';
+    d.innerHTML='<b></b><small></small><div class="row"></div>';
+    d.querySelector('b').textContent=n.title||'(無題)';
+    d.querySelector('small').textContent=(n.body||'')+(n.fileName?(' / 動画 '+n.fileName+' '+fmt(n.fileSize||0)):'');
+    const row=d.querySelector('.row');
+    const open=document.createElement('button'); open.textContent='開く';
+    open.onclick=()=>{ $('ntitle').value=n.title||''; $('nbody').value=n.body||''; noteVid=n.blob?new File([n.blob],n.fileName||'video.mp4',{type:n.type||'video/mp4'}):null; $('nvidname').textContent=noteVid?('付ける動画: '+noteVid.name):''; };
+    row.appendChild(open);
+    if(n.blob){ const dl=document.createElement('button'); dl.textContent='動画保存'; dl.onclick=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(n.blob); a.download=n.fileName||'video.mp4'; a.click(); }; row.appendChild(dl); }
+    const rm=document.createElement('button'); rm.textContent='消す'; rm.onclick=async()=>{ if(confirm('消しますか？')){ await delNote(n.id); renderNotes(); } }; row.appendChild(rm);
+    $('nlist').appendChild(d);
+  });
 }
-function updZ(){
-  if(!zfiles.length){ $('zest').style.display='none'; return; }
-  const from=zfiles.reduce((s,f)=>s+f.size,0);
-  const lv=+$('zlv').value;
-  const to=zfiles.reduce((s,f)=>s+f.size*zRatio(f.name,lv),0)+64;
-  showEst('zest',from,to);
-}
-function targetH(){
-  const mode=$('vres').value;
-  if(mode==='orig') return vmeta.h||720;
-  return Math.min(vmeta.h||+mode,+mode);
-}
+function zRatio(name,lv){ const e=(name.split('.').pop()||'').toLowerCase(); const hard='jpg,jpeg,png,gif,webp,mp3,mp4,mov,webm,zip,rar,7z,docx,xlsx,pptx'; const text='txt,csv,html,css,js,json,xml,svg,md'; const b=lv>=9?0.08:lv>=6?0.04:0; if(hard.split(',').includes(e)) return 0.96; if(text.split(',').includes(e)) return Math.max(0.2,0.42-b); return Math.max(0.45,0.72-b); }
+function updZ(){ if(!zfiles.length){ $('zest').style.display='none'; return; } const from=zfiles.reduce((s,f)=>s+f.size,0); const lv=+$('zlv').value; showEst('zest',from,zfiles.reduce((s,f)=>s+f.size*zRatio(f.name,lv),0)+64); }
+function targetH(){ const mode=$('vres').value; if(mode==='orig') return vmeta.h||720; return Math.min(vmeta.h||+mode,+mode); }
 function crfOf(){ return ({high:23,medium:28,low:32})[$('vq').value]; }
-function updV(){
-  if(!vfile||!vmeta.w){ $('vest').style.display='none'; return; }
-  const h=targetH();
-  const w=Math.round((vmeta.w||1280)*h/(vmeta.h||720));
-  const crf=crfOf();
-  const bpp=crf<=23?0.12:crf<=28?0.07:0.04;
-  const bits=w*h*30*bpp;
-  const dur=vmeta.d>0?vmeta.d:10;
-  const to=Math.max(80*1024,(bits/8)*dur+12000*dur);
-  showEst('vest',vfile.size,to);
-}
-async function loadFF(){
-  if(ff&&ff.isLoaded()) return ff;
-  if(typeof FFmpeg==='undefined') throw new Error('圧縮エンジンを読み込めませんでした');
-  const {createFFmpeg}=FFmpeg;
-  ff=createFFmpeg({
-    log:false,
-    mainName:'main',
-    corePath:'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'
-  });
-  ff.setProgress(({ratio})=>{
-    const p=Math.max(0,Math.min(99,Math.round((ratio||0)*100)));
-    const dur=vmeta.d||0;
-    const t=dur*(ratio||0);
-    setNum(p, (dur? (t.toFixed(1)+'秒 / '+dur.toFixed(1)+'秒') : '圧縮中'));
-  });
-  say('初回だけ圧縮エンジンを読み込みます');
-  setNum(0,'エンジン読み込み中');
-  await ff.load();
-  return ff;
-}
-$('t1').onclick=()=>{ $('t1').className='on'; $('t2').className=''; $('p1').style.display='block'; $('p2').style.display='none'; };
-$('t2').onclick=()=>{ $('t2').className='on'; $('t1').className=''; $('p2').style.display='block'; $('p1').style.display='none'; };
-$('zdrop').onclick=()=>$('zin').click();
-$('zlv').onchange=updZ;
-$('zin').onchange=()=>{
-  zfiles=[...$('zin').files];
-  $('zlist').textContent=zfiles.map(f=>f.name+' ('+fmt(f.size)+')').join('\n')||'未選択';
-  $('zbtn').disabled=!zfiles.length;
-  updZ();
-};
-$('zbtn').onclick=async()=>{
-  say('圧縮しています…');
-  try{
-    if(typeof JSZip==='undefined'){ say('ZIP用の部品を読み込めませんでした'); return; }
-    const zip=new JSZip();
-    const from=zfiles.reduce((s,f)=>s+f.size,0);
-    zfiles.forEach(f=>zip.file(f.name,f));
-    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:+$('zlv').value}});
-    readyFile(blob,'compressed.zip',from);
-  }catch(e){ say('ZIP失敗: '+(e.message||e)); }
-};
-$('vdrop').onclick=()=>$('vin').click();
-$('vres').onchange=updV; $('vq').onchange=updV;
-$('vin').onchange=()=>{
-  const f=$('vin').files[0]; if(!f) return;
-  vfile=f;
-  const v=$('vp');
-  v.src=URL.createObjectURL(f);
-  v.onloadedmetadata=()=>{
-    vmeta={w:v.videoWidth,h:v.videoHeight,d:v.duration||0};
-    $('vbtn').disabled=false;
-    updV();
-    $('vinfo').textContent=f.name+' / '+vmeta.w+'x'+vmeta.h+' / '+(vmeta.d?vmeta.d.toFixed(1)+'秒 / ':'')+fmt(f.size);
-    setNum(0,(vmeta.d?vmeta.d.toFixed(1)+'秒の動画':'動画を選択済み'));
-    say('動画を選びました。再生はしません。');
-  };
-  v.onerror=()=>say('この動画は読み込めません');
-};
-$('vbtn').onclick=async()=>{
-  if(!vfile){ say('先に動画を選んでください'); return; }
-  $('vbtn').disabled=true;
-  try{
-    const engine=await loadFF();
-    const {fetchFile}=FFmpeg;
-    const ext=(vfile.name.split('.').pop()||'mp4').toLowerCase();
-    const inn='in.'+(ext.match(/^[a-z0-9]+$/) ? ext : 'mp4');
-    say('ファイルを渡しています…');
-    setNum(1,'ファイル準備');
-    engine.FS('writeFile', inn, await fetchFile(vfile));
-    const h=targetH();
-    const crf=String(crfOf());
-    const args=['-i',inn,'-vf','scale=-2:'+h+',fps=30','-c:v','libx264','-preset','veryfast','-crf',crf,'-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-ac','2','-movflags','+faststart','-y','out.mp4'];
-    say('圧縮中… 数字が増えるまで待ってください');
-    await engine.run(...args);
-    const data=engine.FS('readFile','out.mp4');
-    const blob=new Blob([data.buffer],{type:'video/mp4'});
-    try{ engine.FS('unlink',inn); engine.FS('unlink','out.mp4'); }catch(e){}
-    if(!blob.size) throw new Error('出力が空でした');
-    setNum(100,'完了');
-    readyFile(blob, vfile.name.replace(/\.[^.]+$/,'')+'_'+h+'p.mp4', vfile.size);
-  }catch(e){
-    say('動画失敗: '+(e.message||e)+'\nChromeで開き直すか、短い動画で試してください。');
-  }finally{ $('vbtn').disabled=!vfile; }
-};
+function updV(){ if(!vfile||!vmeta.w){ $('vest').style.display='none'; return; } const h=targetH(); const w=Math.round((vmeta.w||1280)*h/(vmeta.h||720)); const crf=crfOf(); const bpp=crf<=23?0.12:crf<=28?0.07:0.04; const dur=vmeta.d>0?vmeta.d:10; showEst('vest',vfile.size,Math.max(80*1024,(w*h*30*bpp/8)*dur+12000*dur)); }
+async function loadFF(){ if(ff&&ff.isLoaded()) return ff; if(typeof FFmpeg==='undefined') throw new Error('圧縮エンジンを読み込めませんでした'); ff=FFmpeg.createFFmpeg({log:false,mainName:'main',corePath:'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'}); ff.setProgress(({ratio})=>{ const p=Math.max(0,Math.min(99,Math.round((ratio||0)*100))); const dur=vmeta.d||0; setNum(p, dur? ((dur*(ratio||0)).toFixed(1)+'秒 / '+dur.toFixed(1)+'秒') : '圧縮中'); }); say('初回だけ圧縮エンジンを読み込みます'); setNum(0,'エンジン読み込み中'); await ff.load(); return ff; }
+function showTab(n){ ['t1','t2','t3'].forEach((id,i)=>{ $(id).className=i===n-1?'on':''; $('p'+(i+1)).style.display=i===n-1?'block':'none'; }); if(n===3) renderNotes(); }
+$('t1').onclick=()=>showTab(1); $('t2').onclick=()=>showTab(2); $('t3').onclick=()=>showTab(3);
+$('zdrop').onclick=()=>$('zin').click(); $('zlv').onchange=updZ;
+$('zin').onchange=()=>{ zfiles=[...$('zin').files]; $('zlist').textContent=zfiles.map(f=>f.name+' ('+fmt(f.size)+')').join('\n'); $('zbtn').disabled=!zfiles.length; updZ(); };
+$('zbtn').onclick=async()=>{ say('圧縮しています…'); try{ const zip=new JSZip(); const from=zfiles.reduce((s,f)=>s+f.size,0); zfiles.forEach(f=>zip.file(f.name,f)); readyFile(await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:+$('zlv').value}}),'compressed.zip',from); }catch(e){ say('ZIP失敗: '+(e.message||e)); } };
+$('vdrop').onclick=()=>$('vin').click(); $('vres').onchange=updV; $('vq').onchange=updV;
+$('vin').onchange=()=>{ const f=$('vin').files[0]; if(!f) return; vfile=f; const v=$('vp'); v.src=URL.createObjectURL(f); v.onloadedmetadata=()=>{ vmeta={w:v.videoWidth,h:v.videoHeight,d:v.duration||0}; $('vbtn').disabled=false; updV(); $('vinfo').textContent=f.name+' / '+vmeta.w+'x'+vmeta.h+' / '+(vmeta.d?vmeta.d.toFixed(1)+'秒 / ':'')+fmt(f.size); }; };
+$('vbtn').onclick=async()=>{ if(!vfile) return; $('vbtn').disabled=true; try{ const engine=await loadFF(); const ext=(vfile.name.split('.').pop()||'mp4').toLowerCase(); const inn='in.'+(ext.match(/^[a-z0-9]+$/) ? ext : 'mp4'); setNum(1,'ファイル準備'); engine.FS('writeFile', inn, await FFmpeg.fetchFile(vfile)); const h=targetH(); await engine.run('-i',inn,'-vf','scale=-2:'+h+',fps=30','-c:v','libx264','-preset','veryfast','-crf',String(crfOf()),'-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-ac','2','-movflags','+faststart','-y','out.mp4'); const data=engine.FS('readFile','out.mp4'); const blob=new Blob([data.buffer],{type:'video/mp4'}); try{ engine.FS('unlink',inn); engine.FS('unlink','out.mp4'); }catch(e){} setNum(100,'完了'); readyFile(blob, vfile.name.replace(/\.[^.]+$/,'')+'_'+h+'p.mp4', vfile.size); }catch(e){ say('動画失敗: '+(e.message||e)); } finally{ $('vbtn').disabled=!vfile; } };
+$('npick').onclick=()=>$('nvid').click();
+$('nvid').onchange=()=>{ const f=$('nvid').files[0]; if(!f) return; noteVid=f; $('nvidname').textContent='付ける動画: '+f.name+' ('+fmt(f.size)+')'; };
+$('nsave').onclick=async()=>{ const title=$('ntitle').value.trim(); const body=$('nbody').value; if(!title && !body && !noteVid){ say('題名か本文を書いてください'); return; } const n={id:Date.now(), title:title||'(無題)', body, fileName:noteVid?noteVid.name:'', fileSize:noteVid?noteVid.size:0, type:noteVid?noteVid.type:'', blob:noteVid||null}; try{ await putNote(n); say('メモを保存しました'); renderNotes(); }catch(e){ say('保存失敗: 動画が大きすぎる可能性があります。'+(e.message||e)); } };
+renderNotes();
 </script>
 </body>
 </html>
