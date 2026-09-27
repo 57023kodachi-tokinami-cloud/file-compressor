@@ -3,38 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ファイル圧縮と便利帖</title>
+<title>圧縮と便利帖</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <style>
 body{font-family:sans-serif;background:#0f172a;color:#f1f5f9;margin:0;padding:16px}
 .wrap{max-width:640px;margin:0 auto}
-h1{font-size:22px;margin:0 0 6px}
-.sub{color:#94a3b8;margin:0 0 12px;line-height:1.5}
+h1{font-size:22px}
+.sub{color:#94a3b8;line-height:1.5}
 .tab{display:flex;gap:6px;margin:12px 0}
-.tab button{flex:1;padding:10px 6px;border:0;border-radius:8px;background:#1e293b;color:#94a3b8;font-size:14px}
+.tab button{flex:1;padding:10px;border:0;border-radius:8px;background:#1e293b;color:#94a3b8}
 .tab button.on{background:#6366f1;color:#fff}
 .card{background:#1e293b;border-radius:12px;padding:16px}
-.drop{border:2px dashed #334155;border-radius:10px;padding:22px;text-align:center}
+.drop{border:2px dashed #334155;border-radius:10px;padding:20px;text-align:center}
 button.main{width:100%;margin-top:10px;padding:12px;border:0;border-radius:8px;background:#6366f1;color:#fff;font-weight:700}
-button.main:disabled{opacity:.5}
 button.green{background:#22c55e;color:#052e16}
-select,input,textarea{background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;padding:8px;width:100%;box-sizing:border-box}
+input,textarea{width:100%;box-sizing:border-box;background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;padding:8px}
 textarea{min-height:120px;margin-top:8px}
-.msg{margin-top:10px;color:#94a3b8;white-space:pre-wrap}
 .item{background:#0f172a;border-radius:8px;padding:10px;margin-top:8px}
 .item b{display:block}
 .item small{color:#94a3b8}
 .row{display:flex;gap:8px;margin-top:8px}
 .row button{flex:1;border:0;border-radius:6px;padding:8px;background:#334155;color:#fff}
-.warn{font-size:12px;color:#94a3b8;margin-top:8px}
+.ok{color:#22c55e;font-weight:700}
+.msg{margin-top:10px;color:#94a3b8;white-space:pre-wrap}
+.warn{font-size:12px;color:#94a3b8;margin:8px 0}
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>📦 圧縮＋便利帖</h1>
-<p class="sub">題名をつけて書けます。開くと上に再表示します。</p>
-<div class="tab"><button class="on" id="t1">ZIP</button><button id="t2">動画</button><button id="t3">メモ</button></div>
+<p class="sub">題名をつけて書けます。メモはこの手順と、GitHubのクラウドファイルに残せます。</p>
+<div class="tab">
+<button class="on" id="t1">ZIP</button>
+<button id="t2">メモ</button>
+<button id="t3">クラウド</button>
+</div>
 <div class="card">
 <div id="p1">
 <div class="drop" id="zdrop">ファイルを選ぶ</div>
@@ -43,21 +46,18 @@ textarea{min-height:120px;margin-top:8px}
 <button class="main" id="zbtn" disabled>ZIPを作る</button>
 </div>
 <div id="p2" style="display:none">
-<div class="drop" id="vdrop">動画を選ぶ</div>
-<input id="vin" type="file" accept="video/*" hidden>
-<p id="vinfo"></p>
-<button class="main" id="vbtn" disabled>動画を圧縮</button>
-</div>
-<div id="p3" style="display:none">
 <p id="nowopen" class="warn">新しいメモ</p>
 <input id="ntitle" placeholder="題名">
 <textarea id="nbody" placeholder="ここに書く"></textarea>
-<button class="main" id="npick">動画を付ける</button>
-<input id="nvid" type="file" accept="video/*" hidden>
-<p id="nvidname" class="warn"></p>
-<button class="main green" id="nsave">メモを保存</button>
+<button class="main green" id="nsave">この手順に保存</button>
+<button class="main" id="ncloud">クラウド用ファイルを作る</button>
 <button class="main" id="nnew">新しいメモ</button>
 <div id="nlist"></div>
+</div>
+<div id="p3" style="display:none">
+<p class="warn">GitHubの <b>cloud-notes.json</b> がクラウドの便利帖です。下に読み込みます。</p>
+<button class="main" id="creload">クラウドから読む</button>
+<div id="clist"></div>
 </div>
 <a id="dl" class="main green" style="display:none;text-align:center;text-decoration:none;margin-top:12px" href="#">ダウンロード</a>
 <p class="msg" id="msg"></p>
@@ -65,29 +65,25 @@ textarea{min-height:120px;margin-top:8px}
 </div>
 <script>
 const $=id=>document.getElementById(id);
-let zfiles=[], vfile=null, ready='', noteVid=null;
-function fmt(n){ if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB'; }
+const CLOUD='https://raw.githubusercontent.com/57023kodachi-tokinami-cloud/file-compressor/main/cloud-notes.json';
+let zfiles=[], ready='';
 function say(t){ $('msg').textContent=t; }
-function showTab(n){ [1,2,3].forEach(i=>{ $('t'+i).className=i===n?'on':''; $('p'+i).style.display=i===n?'block':'none'; }); if(n===3) renderNotes(); }
-$('t1').onclick=()=>showTab(1); $('t2').onclick=()=>showTab(2); $('t3').onclick=()=>showTab(3);
-function setDL(blob,name){ if(ready) URL.revokeObjectURL(ready); ready=URL.createObjectURL(blob); const a=$('dl'); a.href=ready; a.download=name; a.style.display='block'; a.textContent='⬇️ '+name; }
-function dbp(){ return new Promise((res,rej)=>{ const r=indexedDB.open('locker',1); r.onupgradeneeded=()=>r.result.createObjectStore('notes',{keyPath:'id'}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
-async function allNotes(){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes').objectStore('notes').getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }); }
-async function putNote(n){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes','readwrite').objectStore('notes').put(n); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); }
-async function delNote(id){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes','readwrite').objectStore('notes').delete(id); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); }
+function showTab(n){ [1,2,3].forEach(i=>{ $('t'+i).className=i===n?'on':''; $('p'+i).style.display=i===n?'block':'none'; }); if(n===2) renderLocal(); if(n===3) loadCloud(); }
+$('t1').onclick=()=>showTab(1);
+$('t2').onclick=()=>showTab(2);
+$('t3').onclick=()=>showTab(3);
+function localList(){ try{ return JSON.parse(localStorage.getItem('memos')||'[]'); }catch(e){ return []; } }
+function localSave(list){ localStorage.setItem('memos', JSON.stringify(list)); }
 function openNote(n){
-  showTab(3);
+  showTab(2);
   $('ntitle').value=n.title||'';
   $('nbody').value=n.body||'';
-  noteVid=n.blob?n.blob:null;
-  $('nvidname').textContent=n.fileName?('動画: '+n.fileName):'';
   $('nowopen').textContent='開いている: '+(n.title||'無題');
   say('開きました: '+(n.title||'無題'));
   window.scrollTo(0,0);
 }
-async function renderNotes(){
-  let list=[]; try{ list=await allNotes(); }catch(e){ $('nlist').textContent='読めません'; return; }
-  list.sort((a,b)=>b.id-a.id);
+function renderLocal(){
+  const list=localList().sort((a,b)=>b.id-a.id);
   $('nlist').innerHTML=list.length?'':'<p class="warn">まだありません</p>';
   list.forEach(n=>{
     const d=document.createElement('div'); d.className='item';
@@ -95,22 +91,62 @@ async function renderNotes(){
     const s=document.createElement('small'); s.textContent=(n.body||'').slice(0,80);
     const row=document.createElement('div'); row.className='row';
     const o=document.createElement('button'); o.textContent='開く'; o.onclick=e=>{ e.stopPropagation(); openNote(n); };
-    const rm=document.createElement('button'); rm.textContent='消す'; rm.onclick=async e=>{ e.stopPropagation(); if(confirm('消す?')){ await delNote(n.id); renderNotes(); } };
+    const rm=document.createElement('button'); rm.textContent='消す'; rm.onclick=e=>{ e.stopPropagation(); const next=localList().filter(x=>x.id!==n.id); localSave(next); renderLocal(); };
     d.onclick=()=>openNote(n);
-    row.appendChild(o); row.appendChild(rm); d.appendChild(b); d.appendChild(s); d.appendChild(row); $('nlist').appendChild(d);
+    row.appendChild(o); row.appendChild(rm);
+    d.appendChild(b); d.appendChild(s); d.appendChild(row);
+    $('nlist').appendChild(d);
   });
 }
+function renderCloud(list){
+  $('clist').innerHTML='';
+  if(!list.length){ $('clist').innerHTML='<p class="warn">クラウドにメモはまだありません</p>'; return; }
+  list.forEach(n=>{
+    const d=document.createElement('div'); d.className='item';
+    d.innerHTML='<b></b><small></small>';
+    d.querySelector('b').textContent=n.title||'無題';
+    d.querySelector('small').textContent=n.body||'';
+    d.onclick=()=>openNote(n);
+    $('clist').appendChild(d);
+  });
+}
+async function loadCloud(){
+  say('クラウドを読んでいます…');
+  try{
+    const res=await fetch(CLOUD+'?t='+Date.now());
+    const list=await res.json();
+    renderCloud(Array.isArray(list)?list:[]);
+    say('クラウド読み込み成功（'+ (Array.isArray(list)?list.length:0) +'件）');
+  }catch(e){ say('クラウドを読めませんでした'); }
+}
+$('creload').onclick=loadCloud;
+$('nnew').onclick=()=>{ $('ntitle').value=''; $('nbody').value=''; $('nowopen').textContent='新しいメモ'; say('新しいメモ'); };
+$('nsave').onclick=()=>{
+  const title=$('ntitle').value.trim();
+  const body=$('nbody').value;
+  if(!title&&!body){ say('題名か本文を書いてください'); return; }
+  const list=localList();
+  list.push({id:Date.now(), title:title||'無題', body});
+  localSave(list);
+  renderLocal();
+  say('成功：この手順に保存しました');
+};
+$('ncloud').onclick=()=>{
+  const title=$('ntitle').value.trim();
+  const body=$('nbody').value;
+  const local=localList();
+  const extra=(!title&&!body)?[]:[{id:Date.now(), title:title||'無題', body}];
+  const all=local.concat(extra);
+  const blob=new Blob([JSON.stringify(all,null,2)],{type:'application/json'});
+  if(ready) URL.revokeObjectURL(ready);
+  ready=URL.createObjectURL(blob);
+  const a=$('dl'); a.href=ready; a.download='cloud-notes.json'; a.style.display='block'; a.textContent='⬇️ cloud-notes.json を保存';
+  say('成功：クラウド用ファイルを作りました。下の緑ボタンで保存し、GitHubの cloud-notes.json に上書きしてください。');
+};
 $('zdrop').onclick=()=>$('zin').click();
 $('zin').onchange=()=>{ zfiles=[...$('zin').files]; $('zlist').textContent=zfiles.map(f=>f.name).join(', '); $('zbtn').disabled=!zfiles.length; };
-$('zbtn').onclick=async()=>{ try{ const zip=new JSZip(); zfiles.forEach(f=>zip.file(f.name,f)); const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'}); setDL(blob,'compressed.zip'); say('ZIPできました '+fmt(blob.size)); }catch(e){ say(String(e)); } };
-$('vdrop').onclick=()=>$('vin').click();
-$('vin').onchange=()=>{ vfile=$('vin').files[0]; $('vinfo').textContent=vfile?vfile.name:''; $('vbtn').disabled=!vfile; };
-$('vbtn').onclick=async()=>{ if(!vfile) return; say('圧縮は手順が重いので、まずこのファイルをメモに保存できます'); $('ntitle').value=vfile.name; noteVid=vfile; $('nvidname').textContent='動画: '+vfile.name; showTab(3); };
-$('npick').onclick=()=>$('nvid').click();
-$('nvid').onchange=()=>{ noteVid=$('nvid').files[0]; $('nvidname').textContent=noteVid?('動画: '+noteVid.name):''; };
-$('nnew').onclick=()=>{ $('ntitle').value=''; $('nbody').value=''; noteVid=null; $('nvidname').textContent=''; $('nowopen').textContent='新しいメモ'; };
-$('nsave').onclick=async()=>{ const title=$('ntitle').value.trim(); const body=$('nbody').value; if(!title&&!body&&!noteVid){ say('題名を書いてください'); return; } try{ await putNote({id:Date.now(),title:title||'無題',body,fileName:noteVid&&noteVid.name||'',blob:noteVid||null}); say('保存しました'); renderNotes(); }catch(e){ say('保存失敗'); } };
-renderNotes();
+$('zbtn').onclick=async()=>{ try{ const zip=new JSZip(); zfiles.forEach(f=>zip.file(f.name,f)); const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'}); if(ready) URL.revokeObjectURL(ready); ready=URL.createObjectURL(blob); const a=$('dl'); a.href=ready; a.download='compressed.zip'; a.style.display='block'; a.textContent='⬇️ compressed.zip'; say('成功：ZIPを作りました'); }catch(e){ say(String(e)); } };
+renderLocal();
 </script>
 </body>
 </html>
