@@ -19,112 +19,97 @@ h1{font-size:22px;margin:0 0 6px}
 button.main{width:100%;margin-top:10px;padding:12px;border:0;border-radius:8px;background:#6366f1;color:#fff;font-weight:700}
 button.main:disabled{opacity:.5}
 button.green{background:#22c55e;color:#052e16}
-a.dl{display:none;margin-top:12px;padding:12px;border-radius:8px;background:#22c55e;color:#052e16;text-align:center;text-decoration:none;font-weight:700}
 select,input,textarea{background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;padding:8px;width:100%;box-sizing:border-box}
 textarea{min-height:120px;margin-top:8px}
-.est{margin-top:10px;padding:10px;border-radius:8px;background:#312e81;display:none}
-.est b.down{color:#22c55e;font-size:18px}
 .msg{margin-top:10px;color:#94a3b8;white-space:pre-wrap}
-.num{display:none;margin-top:12px;text-align:center}
-.num .big{font-size:42px;font-weight:800;color:#a5b4fc}
 .item{background:#0f172a;border-radius:8px;padding:10px;margin-top:8px}
 .item b{display:block}
 .item small{color:#94a3b8}
 .row{display:flex;gap:8px;margin-top:8px}
 .row button{flex:1;border:0;border-radius:6px;padding:8px;background:#334155;color:#fff}
-.warn{font-size:12px;color:#94a3b8;margin-top:8px;line-height:1.5}
+.warn{font-size:12px;color:#94a3b8;margin-top:8px}
 </style>
 </head>
 <body>
 <div class="wrap">
 <h1>📦 圧縮＋便利帖</h1>
-<p class="sub">題名をつけてメモを書けます。動画は同じメモに残せます。</p>
-<div class="tab">
-  <button class="on" id="t1">ZIP</button>
-  <button id="t2">動画</button>
-  <button id="t3">メモ</button>
-</div>
+<p class="sub">題名をつけて書けます。開くと上に再表示します。</p>
+<div class="tab"><button class="on" id="t1">ZIP</button><button id="t2">動画</button><button id="t3">メモ</button></div>
 <div class="card">
 <div id="p1">
-<div class="drop" id="zdrop">ファイルをタップして選ぶ</div>
+<div class="drop" id="zdrop">ファイルを選ぶ</div>
 <input id="zin" type="file" multiple hidden>
 <p id="zlist"></p>
-<label>圧縮 <select id="zlv"><option value="1">最速</option><option value="6" selected>標準</option><option value="9">最高</option></select></label>
-<div class="est" id="zest"></div>
 <button class="main" id="zbtn" disabled>ZIPを作る</button>
 </div>
 <div id="p2" style="display:none">
-<div class="drop" id="vdrop">動画をタップして選ぶ</div>
-<input id="vin" type="file" accept="video/*,*/*" hidden>
-<video id="vp" muted playsinline style="display:none"></video>
+<div class="drop" id="vdrop">動画を選ぶ</div>
+<input id="vin" type="file" accept="video/*" hidden>
 <p id="vinfo"></p>
-<p>解像度 <select id="vres"><option value="orig">元のまま</option><option value="1080">1080p</option><option value="720" selected>720p</option><option value="480">480p</option><option value="360">360p</option></select></p>
-<p>画質 <select id="vq"><option value="high">高画質</option><option value="medium" selected>標準</option><option value="low">軽量</option></select></p>
-<div class="est" id="vest"></div>
 <button class="main" id="vbtn" disabled>動画を圧縮</button>
-<div class="num" id="num"><div class="big" id="numPct">0%</div><div id="numSec">準備中</div></div>
 </div>
 <div id="p3" style="display:none">
 <p id="nowopen" class="warn">新しいメモ</p>
 <input id="ntitle" placeholder="題名">
 <textarea id="nbody" placeholder="ここに書く"></textarea>
-<p class="warn">動画はこのスマホのブラウザに残ります。GitHubには置けません。</p>
-<input id="nvid" type="file" accept="video/*" hidden>
 <button class="main" id="npick">動画を付ける</button>
-<p id="nvidname"></p>
+<input id="nvid" type="file" accept="video/*" hidden>
+<p id="nvidname" class="warn"></p>
 <button class="main green" id="nsave">メモを保存</button>
 <button class="main" id="nnew">新しいメモ</button>
 <div id="nlist"></div>
 </div>
-<a class="dl" id="dl" href="#">ダウンロード</a>
+<a id="dl" class="main green" style="display:none;text-align:center;text-decoration:none;margin-top:12px" href="#">ダウンロード</a>
 <p class="msg" id="msg"></p>
 </div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
-let zfiles=[], vfile=null, vmeta={w:0,h:0,d:0}, ready='', ff=null, noteVid=null;
-function fmt(n){n=Math.max(0,+n||0); if(n<1024)return Math.round(n)+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB';}
+let zfiles=[], vfile=null, ready='', noteVid=null;
+function fmt(n){ if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB'; }
 function say(t){ $('msg').textContent=t; }
-function showTab(n){ ['t1','t2','t3'].forEach((id,i)=>{ $(id).className=i===n-1?'on':''; $('p'+(i+1)).style.display=i===n-1?'block':'none'; }); if(n===3) renderNotes(); }
-function openNote(n){
-  $('t3').className='on'; $('t1').className=''; $('t2').className='';
-  $('p3').style.display='block'; $('p1').style.display='none'; $('p2').style.display='none';
-  $('ntitle').value=n.title||'';
-  $('nbody').value=n.body||'';
-  noteVid=n.blob?new File([n.blob], n.fileName||'video.mp4', {type:n.type||'video/mp4'}):null;
-  $('nvidname').textContent=noteVid?('付ける動画: '+(n.fileName||'')):'動画なし';
-  $('nowopen').textContent='開いているメモ: '+(n.title||'(無題)');
-  say('「'+(n.title||'無題')+'」を開きました');
-  setTimeout(()=>{ $('ntitle').focus(); $('ntitle').scrollIntoView({block:'center'}); }, 50);
-}
+function showTab(n){ [1,2,3].forEach(i=>{ $('t'+i).className=i===n?'on':''; $('p'+i).style.display=i===n?'block':'none'; }); if(n===3) renderNotes(); }
+$('t1').onclick=()=>showTab(1); $('t2').onclick=()=>showTab(2); $('t3').onclick=()=>showTab(3);
+function setDL(blob,name){ if(ready) URL.revokeObjectURL(ready); ready=URL.createObjectURL(blob); const a=$('dl'); a.href=ready; a.download=name; a.style.display='block'; a.textContent='⬇️ '+name; }
 function dbp(){ return new Promise((res,rej)=>{ const r=indexedDB.open('locker',1); r.onupgradeneeded=()=>r.result.createObjectStore('notes',{keyPath:'id'}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
 async function allNotes(){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes').objectStore('notes').getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }); }
 async function putNote(n){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes','readwrite').objectStore('notes').put(n); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); }
 async function delNote(id){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes','readwrite').objectStore('notes').delete(id); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); }
+function openNote(n){
+  showTab(3);
+  $('ntitle').value=n.title||'';
+  $('nbody').value=n.body||'';
+  noteVid=n.blob?n.blob:null;
+  $('nvidname').textContent=n.fileName?('動画: '+n.fileName):'';
+  $('nowopen').textContent='開いている: '+(n.title||'無題');
+  say('開きました: '+(n.title||'無題'));
+  window.scrollTo(0,0);
+}
 async function renderNotes(){
-  let list=[]; try{ list=await allNotes(); }catch(e){ $('nlist').textContent='メモを読めません'; return; }
+  let list=[]; try{ list=await allNotes(); }catch(e){ $('nlist').textContent='読めません'; return; }
   list.sort((a,b)=>b.id-a.id);
-  $('nlist').innerHTML=list.length?'':'<p class="warn">まだメモはありません</p>';
+  $('nlist').innerHTML=list.length?'':'<p class="warn">まだありません</p>';
   list.forEach(n=>{
     const d=document.createElement('div'); d.className='item';
-    const title=document.createElement('b'); title.textContent=n.title||'(無題)';
-    const sm=document.createElement('small'); sm.textContent=(n.body||'（本文なし）').slice(0,80)+(n.fileName?(' / '+n.fileName):'');
+    const b=document.createElement('b'); b.textContent=n.title||'無題';
+    const s=document.createElement('small'); s.textContent=(n.body||'').slice(0,80);
     const row=document.createElement('div'); row.className='row';
-    const open=document.createElement('button'); open.type='button'; open.textContent='開く';
-    open.onclick=function(e){ e.preventDefault(); e.stopPropagation(); openNote(n); };
-    d.onclick=function(){ openNote(n); };
-    row.appendChild(open);
-    if(n.blob){ const dl=document.createElement('button'); dl.type='button'; dl.textContent='動画保存'; dl.onclick=function(e){ e.preventDefault(); e.stopPropagation(); const a=document.createElement('a'); a.href=URL.createObjectURL(n.blob); a.download=n.fileName||'video.mp4'; a.click(); }; row.appendChild(dl); }
-    const rm=document.createElement('button'); rm.type='button'; rm.textContent='消す';
-    rm.onclick=async function(e){ e.preventDefault(); e.stopPropagation(); if(confirm('消しますか？')){ await delNote(n.id); renderNotes(); } };
-    row.appendChild(rm); d.appendChild(title); d.appendChild(sm); d.appendChild(row); $('nlist').appendChild(d);
+    const o=document.createElement('button'); o.textContent='開く'; o.onclick=e=>{ e.stopPropagation(); openNote(n); };
+    const rm=document.createElement('button'); rm.textContent='消す'; rm.onclick=async e=>{ e.stopPropagation(); if(confirm('消す?')){ await delNote(n.id); renderNotes(); } };
+    d.onclick=()=>openNote(n);
+    row.appendChild(o); row.appendChild(rm); d.appendChild(b); d.appendChild(s); d.appendChild(row); $('nlist').appendChild(d);
   });
 }
-$('t1').onclick=()=>showTab(1); $('t2').onclick=()=>showTab(2); $('t3').onclick=()=>showTab(3);
+$('zdrop').onclick=()=>$('zin').click();
+$('zin').onchange=()=>{ zfiles=[...$('zin').files]; $('zlist').textContent=zfiles.map(f=>f.name).join(', '); $('zbtn').disabled=!zfiles.length; };
+$('zbtn').onclick=async()=>{ try{ const zip=new JSZip(); zfiles.forEach(f=>zip.file(f.name,f)); const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'}); setDL(blob,'compressed.zip'); say('ZIPできました '+fmt(blob.size)); }catch(e){ say(String(e)); } };
+$('vdrop').onclick=()=>$('vin').click();
+$('vin').onchange=()=>{ vfile=$('vin').files[0]; $('vinfo').textContent=vfile?vfile.name:''; $('vbtn').disabled=!vfile; };
+$('vbtn').onclick=async()=>{ if(!vfile) return; say('圧縮は手順が重いので、まずこのファイルをメモに保存できます'); $('ntitle').value=vfile.name; noteVid=vfile; $('nvidname').textContent='動画: '+vfile.name; showTab(3); };
 $('npick').onclick=()=>$('nvid').click();
-$('nvid').onchange=()=>{ const f=$('nvid').files[0]; if(!f) return; noteVid=f; $('nvidname').textContent='付ける動画: '+f.name; };
-$('nnew').onclick=()=>{ $('ntitle').value=''; $('nbody').value=''; noteVid=null; $('nvidname').textContent=''; $('nowopen').textContent='新しいメモ'; say('新しいメモです'); };
-$('nsave').onclick=async()=>{ const title=$('ntitle').value.trim(); const body=$('nbody').value; if(!title&&!body&&!noteVid){ say('題名か本文を書いてください'); return; } try{ await putNote({id:Date.now(), title:title||'(無題)', body, fileName:noteVid?noteVid.name:'', fileSize:noteVid?noteVid.size:0, type:noteVid?noteVid.type:'', blob:noteVid||null}); say('保存しました'); renderNotes(); }catch(e){ say('保存失敗 '+(e.message||e)); } };
+$('nvid').onchange=()=>{ noteVid=$('nvid').files[0]; $('nvidname').textContent=noteVid?('動画: '+noteVid.name):''; };
+$('nnew').onclick=()=>{ $('ntitle').value=''; $('nbody').value=''; noteVid=null; $('nvidname').textContent=''; $('nowopen').textContent='新しいメモ'; };
+$('nsave').onclick=async()=>{ const title=$('ntitle').value.trim(); const body=$('nbody').value; if(!title&&!body&&!noteVid){ say('題名を書いてください'); return; } try{ await putNote({id:Date.now(),title:title||'無題',body,fileName:noteVid&&noteVid.name||'',blob:noteVid||null}); say('保存しました'); renderNotes(); }catch(e){ say('保存失敗'); } };
 renderNotes();
 </script>
 </body>
