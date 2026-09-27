@@ -65,6 +65,7 @@ textarea{min-height:120px;margin-top:8px}
 <div class="num" id="num"><div class="big" id="numPct">0%</div><div id="numSec">準備中</div></div>
 </div>
 <div id="p3" style="display:none">
+<p id="nowopen" class="warn">新しいメモ</p>
 <input id="ntitle" placeholder="題名">
 <textarea id="nbody" placeholder="ここに書く"></textarea>
 <p class="warn">動画はこのスマホのブラウザに残ります。GitHubには置けません。</p>
@@ -72,6 +73,7 @@ textarea{min-height:120px;margin-top:8px}
 <button class="main" id="npick">動画を付ける</button>
 <p id="nvidname"></p>
 <button class="main green" id="nsave">メモを保存</button>
+<button class="main" id="nnew">新しいメモ</button>
 <div id="nlist"></div>
 </div>
 <a class="dl" id="dl" href="#">ダウンロード</a>
@@ -83,59 +85,46 @@ const $=id=>document.getElementById(id);
 let zfiles=[], vfile=null, vmeta={w:0,h:0,d:0}, ready='', ff=null, noteVid=null;
 function fmt(n){n=Math.max(0,+n||0); if(n<1024)return Math.round(n)+' B'; if(n<1048576)return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB';}
 function say(t){ $('msg').textContent=t; }
-function pctLine(from,to){ const p=Math.round((1-to/from)*100); const label=p>=1?('-'+p+'%'):(p<=-1?('+'+Math.abs(p)+'%'):'±0%'); return '今 '+fmt(from)+' → 予想 '+fmt(to)+'　<b class="down">'+label+'</b>'; }
-function showEst(id,from,to){ const el=$(id); el.style.display='block'; el.innerHTML=pctLine(from,to); }
-function setNum(p,text){ $('num').style.display='block'; $('numPct').textContent=Math.max(0,Math.min(100,Math.round(p)))+'%'; if(text)$('numSec').textContent=text; }
-function readyFile(blob,name,from){
-  if(!blob||!blob.size){ say('保存できるデータがありません'); return; }
-  if(ready) URL.revokeObjectURL(ready);
-  ready=URL.createObjectURL(blob);
-  const a=$('dl'); a.href=ready; a.download=name; a.style.display='block'; a.textContent='⬇️ '+name+' を保存';
-  const p=from?Math.round((1-blob.size/from)*100):0;
-  say('できました '+fmt(from||0)+' → '+fmt(blob.size)+(from?('  ('+(p>=0?'-':'+')+Math.abs(p)+'%)'):''));
-  $('ntitle').value=name.replace(/\.[^.]+$/,'');
-  $('nbody').value='圧縮した動画';
-  noteVid=new File([blob],name,{type:blob.type||'video/mp4'});
-  $('nvidname').textContent='付ける動画: '+name+' ('+fmt(blob.size)+')';
+function showTab(n){ ['t1','t2','t3'].forEach((id,i)=>{ $(id).className=i===n-1?'on':''; $('p'+(i+1)).style.display=i===n-1?'block':'none'; }); if(n===3) renderNotes(); }
+function openNote(n){
+  $('t3').className='on'; $('t1').className=''; $('t2').className='';
+  $('p3').style.display='block'; $('p1').style.display='none'; $('p2').style.display='none';
+  $('ntitle').value=n.title||'';
+  $('nbody').value=n.body||'';
+  noteVid=n.blob?new File([n.blob], n.fileName||'video.mp4', {type:n.type||'video/mp4'}):null;
+  $('nvidname').textContent=noteVid?('付ける動画: '+(n.fileName||'')):'動画なし';
+  $('nowopen').textContent='開いているメモ: '+(n.title||'(無題)');
+  say('「'+(n.title||'無題')+'」を開きました');
+  setTimeout(()=>{ $('ntitle').focus(); $('ntitle').scrollIntoView({block:'center'}); }, 50);
 }
 function dbp(){ return new Promise((res,rej)=>{ const r=indexedDB.open('locker',1); r.onupgradeneeded=()=>r.result.createObjectStore('notes',{keyPath:'id'}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
 async function allNotes(){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes').objectStore('notes').getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }); }
 async function putNote(n){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes','readwrite').objectStore('notes').put(n); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); }
 async function delNote(id){ const db=await dbp(); return new Promise((res,rej)=>{ const q=db.transaction('notes','readwrite').objectStore('notes').delete(id); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); }
 async function renderNotes(){
-  const list=await allNotes(); list.sort((a,b)=>b.id-a.id);
+  let list=[]; try{ list=await allNotes(); }catch(e){ $('nlist').textContent='メモを読めません'; return; }
+  list.sort((a,b)=>b.id-a.id);
   $('nlist').innerHTML=list.length?'':'<p class="warn">まだメモはありません</p>';
   list.forEach(n=>{
     const d=document.createElement('div'); d.className='item';
-    d.innerHTML='<b></b><small></small><div class="row"></div>';
-    d.querySelector('b').textContent=n.title||'(無題)';
-    d.querySelector('small').textContent=(n.body||'')+(n.fileName?(' / 動画 '+n.fileName+' '+fmt(n.fileSize||0)):'');
-    const row=d.querySelector('.row');
-    const open=document.createElement('button'); open.textContent='開く';
-    open.onclick=()=>{ $('ntitle').value=n.title||''; $('nbody').value=n.body||''; noteVid=n.blob?new File([n.blob],n.fileName||'video.mp4',{type:n.type||'video/mp4'}):null; $('nvidname').textContent=noteVid?('付ける動画: '+noteVid.name):''; };
+    const title=document.createElement('b'); title.textContent=n.title||'(無題)';
+    const sm=document.createElement('small'); sm.textContent=(n.body||'（本文なし）').slice(0,80)+(n.fileName?(' / '+n.fileName):'');
+    const row=document.createElement('div'); row.className='row';
+    const open=document.createElement('button'); open.type='button'; open.textContent='開く';
+    open.onclick=function(e){ e.preventDefault(); e.stopPropagation(); openNote(n); };
+    d.onclick=function(){ openNote(n); };
     row.appendChild(open);
-    if(n.blob){ const dl=document.createElement('button'); dl.textContent='動画保存'; dl.onclick=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(n.blob); a.download=n.fileName||'video.mp4'; a.click(); }; row.appendChild(dl); }
-    const rm=document.createElement('button'); rm.textContent='消す'; rm.onclick=async()=>{ if(confirm('消しますか？')){ await delNote(n.id); renderNotes(); } }; row.appendChild(rm);
-    $('nlist').appendChild(d);
+    if(n.blob){ const dl=document.createElement('button'); dl.type='button'; dl.textContent='動画保存'; dl.onclick=function(e){ e.preventDefault(); e.stopPropagation(); const a=document.createElement('a'); a.href=URL.createObjectURL(n.blob); a.download=n.fileName||'video.mp4'; a.click(); }; row.appendChild(dl); }
+    const rm=document.createElement('button'); rm.type='button'; rm.textContent='消す';
+    rm.onclick=async function(e){ e.preventDefault(); e.stopPropagation(); if(confirm('消しますか？')){ await delNote(n.id); renderNotes(); } };
+    row.appendChild(rm); d.appendChild(title); d.appendChild(sm); d.appendChild(row); $('nlist').appendChild(d);
   });
 }
-function zRatio(name,lv){ const e=(name.split('.').pop()||'').toLowerCase(); const hard='jpg,jpeg,png,gif,webp,mp3,mp4,mov,webm,zip,rar,7z,docx,xlsx,pptx'; const text='txt,csv,html,css,js,json,xml,svg,md'; const b=lv>=9?0.08:lv>=6?0.04:0; if(hard.split(',').includes(e)) return 0.96; if(text.split(',').includes(e)) return Math.max(0.2,0.42-b); return Math.max(0.45,0.72-b); }
-function updZ(){ if(!zfiles.length){ $('zest').style.display='none'; return; } const from=zfiles.reduce((s,f)=>s+f.size,0); const lv=+$('zlv').value; showEst('zest',from,zfiles.reduce((s,f)=>s+f.size*zRatio(f.name,lv),0)+64); }
-function targetH(){ const mode=$('vres').value; if(mode==='orig') return vmeta.h||720; return Math.min(vmeta.h||+mode,+mode); }
-function crfOf(){ return ({high:23,medium:28,low:32})[$('vq').value]; }
-function updV(){ if(!vfile||!vmeta.w){ $('vest').style.display='none'; return; } const h=targetH(); const w=Math.round((vmeta.w||1280)*h/(vmeta.h||720)); const crf=crfOf(); const bpp=crf<=23?0.12:crf<=28?0.07:0.04; const dur=vmeta.d>0?vmeta.d:10; showEst('vest',vfile.size,Math.max(80*1024,(w*h*30*bpp/8)*dur+12000*dur)); }
-async function loadFF(){ if(ff&&ff.isLoaded()) return ff; if(typeof FFmpeg==='undefined') throw new Error('圧縮エンジンを読み込めませんでした'); ff=FFmpeg.createFFmpeg({log:false,mainName:'main',corePath:'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'}); ff.setProgress(({ratio})=>{ const p=Math.max(0,Math.min(99,Math.round((ratio||0)*100))); const dur=vmeta.d||0; setNum(p, dur? ((dur*(ratio||0)).toFixed(1)+'秒 / '+dur.toFixed(1)+'秒') : '圧縮中'); }); say('初回だけ圧縮エンジンを読み込みます'); setNum(0,'エンジン読み込み中'); await ff.load(); return ff; }
-function showTab(n){ ['t1','t2','t3'].forEach((id,i)=>{ $(id).className=i===n-1?'on':''; $('p'+(i+1)).style.display=i===n-1?'block':'none'; }); if(n===3) renderNotes(); }
 $('t1').onclick=()=>showTab(1); $('t2').onclick=()=>showTab(2); $('t3').onclick=()=>showTab(3);
-$('zdrop').onclick=()=>$('zin').click(); $('zlv').onchange=updZ;
-$('zin').onchange=()=>{ zfiles=[...$('zin').files]; $('zlist').textContent=zfiles.map(f=>f.name+' ('+fmt(f.size)+')').join('\n'); $('zbtn').disabled=!zfiles.length; updZ(); };
-$('zbtn').onclick=async()=>{ say('圧縮しています…'); try{ const zip=new JSZip(); const from=zfiles.reduce((s,f)=>s+f.size,0); zfiles.forEach(f=>zip.file(f.name,f)); readyFile(await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:+$('zlv').value}}),'compressed.zip',from); }catch(e){ say('ZIP失敗: '+(e.message||e)); } };
-$('vdrop').onclick=()=>$('vin').click(); $('vres').onchange=updV; $('vq').onchange=updV;
-$('vin').onchange=()=>{ const f=$('vin').files[0]; if(!f) return; vfile=f; const v=$('vp'); v.src=URL.createObjectURL(f); v.onloadedmetadata=()=>{ vmeta={w:v.videoWidth,h:v.videoHeight,d:v.duration||0}; $('vbtn').disabled=false; updV(); $('vinfo').textContent=f.name+' / '+vmeta.w+'x'+vmeta.h+' / '+(vmeta.d?vmeta.d.toFixed(1)+'秒 / ':'')+fmt(f.size); }; };
-$('vbtn').onclick=async()=>{ if(!vfile) return; $('vbtn').disabled=true; try{ const engine=await loadFF(); const ext=(vfile.name.split('.').pop()||'mp4').toLowerCase(); const inn='in.'+(ext.match(/^[a-z0-9]+$/) ? ext : 'mp4'); setNum(1,'ファイル準備'); engine.FS('writeFile', inn, await FFmpeg.fetchFile(vfile)); const h=targetH(); await engine.run('-i',inn,'-vf','scale=-2:'+h+',fps=30','-c:v','libx264','-preset','veryfast','-crf',String(crfOf()),'-pix_fmt','yuv420p','-c:a','aac','-b:a','96k','-ac','2','-movflags','+faststart','-y','out.mp4'); const data=engine.FS('readFile','out.mp4'); const blob=new Blob([data.buffer],{type:'video/mp4'}); try{ engine.FS('unlink',inn); engine.FS('unlink','out.mp4'); }catch(e){} setNum(100,'完了'); readyFile(blob, vfile.name.replace(/\.[^.]+$/,'')+'_'+h+'p.mp4', vfile.size); }catch(e){ say('動画失敗: '+(e.message||e)); } finally{ $('vbtn').disabled=!vfile; } };
 $('npick').onclick=()=>$('nvid').click();
-$('nvid').onchange=()=>{ const f=$('nvid').files[0]; if(!f) return; noteVid=f; $('nvidname').textContent='付ける動画: '+f.name+' ('+fmt(f.size)+')'; };
-$('nsave').onclick=async()=>{ const title=$('ntitle').value.trim(); const body=$('nbody').value; if(!title && !body && !noteVid){ say('題名か本文を書いてください'); return; } const n={id:Date.now(), title:title||'(無題)', body, fileName:noteVid?noteVid.name:'', fileSize:noteVid?noteVid.size:0, type:noteVid?noteVid.type:'', blob:noteVid||null}; try{ await putNote(n); say('メモを保存しました'); renderNotes(); }catch(e){ say('保存失敗: 動画が大きすぎる可能性があります。'+(e.message||e)); } };
+$('nvid').onchange=()=>{ const f=$('nvid').files[0]; if(!f) return; noteVid=f; $('nvidname').textContent='付ける動画: '+f.name; };
+$('nnew').onclick=()=>{ $('ntitle').value=''; $('nbody').value=''; noteVid=null; $('nvidname').textContent=''; $('nowopen').textContent='新しいメモ'; say('新しいメモです'); };
+$('nsave').onclick=async()=>{ const title=$('ntitle').value.trim(); const body=$('nbody').value; if(!title&&!body&&!noteVid){ say('題名か本文を書いてください'); return; } try{ await putNote({id:Date.now(), title:title||'(無題)', body, fileName:noteVid?noteVid.name:'', fileSize:noteVid?noteVid.size:0, type:noteVid?noteVid.type:'', blob:noteVid||null}); say('保存しました'); renderNotes(); }catch(e){ say('保存失敗 '+(e.message||e)); } };
 renderNotes();
 </script>
 </body>
