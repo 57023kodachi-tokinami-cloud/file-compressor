@@ -3,150 +3,76 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>圧縮と便利帖</title>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<title>便利帖</title>
 <style>
 body{font-family:sans-serif;background:#0f172a;color:#f1f5f9;margin:0;padding:16px}
 .wrap{max-width:640px;margin:0 auto}
-h1{font-size:22px}
-.sub{color:#94a3b8;line-height:1.5}
-.tab{display:flex;gap:6px;margin:12px 0}
-.tab button{flex:1;padding:10px;border:0;border-radius:8px;background:#1e293b;color:#94a3b8}
-.tab button.on{background:#6366f1;color:#fff}
-.card{background:#1e293b;border-radius:12px;padding:16px}
-.drop{border:2px dashed #334155;border-radius:10px;padding:20px;text-align:center}
-button.main{width:100%;margin-top:10px;padding:12px;border:0;border-radius:8px;background:#6366f1;color:#fff;font-weight:700}
-button.green{background:#22c55e;color:#052e16}
-input,textarea{width:100%;box-sizing:border-box;background:#0f172a;color:#fff;border:1px solid #334155;border-radius:6px;padding:8px}
-textarea{min-height:120px;margin-top:8px}
-.item{background:#0f172a;border-radius:8px;padding:10px;margin-top:8px}
-.item b{display:block}
-.item small{color:#94a3b8}
-.row{display:flex;gap:8px;margin-top:8px}
-.row button{flex:1;border:0;border-radius:6px;padding:8px;background:#334155;color:#fff}
-.ok{color:#22c55e;font-weight:700}
-.msg{margin-top:10px;color:#94a3b8;white-space:pre-wrap}
-.warn{font-size:12px;color:#94a3b8;margin:8px 0}
+h1{font-size:22px;margin:0 0 8px}
+.sub{color:#94a3b8;margin:0 0 12px;line-height:1.5}
+input,textarea{width:100%;box-sizing:border-box;background:#1e293b;color:#fff;border:1px solid #334155;border-radius:10px;padding:12px;font-size:16px}
+textarea{min-height:180px;margin-top:8px}
+.ok{margin:10px 0;color:#22c55e;font-weight:700;min-height:1.2em}
+.item{background:#1e293b;border-radius:10px;padding:12px;margin-top:8px}
+.item b{display:block;font-size:18px}
+.item p{margin:6px 0 0;color:#cbd5e1;white-space:pre-wrap}
+button{margin-top:8px;margin-right:8px;border:0;border-radius:8px;padding:10px 14px;background:#334155;color:#fff}
+.green{background:#22c55e;color:#052e16;font-weight:700}
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1>📦 圧縮＋便利帖</h1>
-<p class="sub">題名をつけて書けます。メモはこの手順と、GitHubのクラウドファイルに残せます。</p>
-<div class="tab">
-<button class="on" id="t1">ZIP</button>
-<button id="t2">メモ</button>
-<button id="t3">クラウド</button>
-</div>
-<div class="card">
-<div id="p1">
-<div class="drop" id="zdrop">ファイルを選ぶ</div>
-<input id="zin" type="file" multiple hidden>
-<p id="zlist"></p>
-<button class="main" id="zbtn" disabled>ZIPを作る</button>
-</div>
-<div id="p2" style="display:none">
-<p id="nowopen" class="warn">新しいメモ</p>
-<input id="ntitle" placeholder="題名">
-<textarea id="nbody" placeholder="ここに書く"></textarea>
-<button class="main green" id="nsave">この手順に保存</button>
-<button class="main" id="ncloud">クラウド用ファイルを作る</button>
-<button class="main" id="nnew">新しいメモ</button>
-<div id="nlist"></div>
-</div>
-<div id="p3" style="display:none">
-<p class="warn">GitHubの <b>cloud-notes.json</b> がクラウドの便利帖です。下に読み込みます。</p>
-<button class="main" id="creload">クラウドから読む</button>
-<div id="clist"></div>
-</div>
-<a id="dl" class="main green" style="display:none;text-align:center;text-decoration:none;margin-top:12px" href="#">ダウンロード</a>
-<p class="msg" id="msg"></p>
-</div>
+<h1>📝 便利帖</h1>
+<p class="sub">題名と本文を書くだけで自動保存します。</p>
+<input id="title" placeholder="題名">
+<textarea id="body" placeholder="ここに書く"></textarea>
+<div class="ok" id="msg"> </div>
+<button class="green" id="newbtn">新しいメモ</button>
+<div id="list"></div>
 </div>
 <script>
 const $=id=>document.getElementById(id);
-const CLOUD='https://raw.githubusercontent.com/57023kodachi-tokinami-cloud/file-compressor/main/cloud-notes.json';
-let zfiles=[], ready='';
+let current=Date.now();
+function load(){ try{ return JSON.parse(localStorage.getItem('easy-memos')||'[]'); }catch(e){ return []; } }
+function saveAll(list){ localStorage.setItem('easy-memos', JSON.stringify(list)); }
 function say(t){ $('msg').textContent=t; }
-function showTab(n){ [1,2,3].forEach(i=>{ $('t'+i).className=i===n?'on':''; $('p'+i).style.display=i===n?'block':'none'; }); if(n===2) renderLocal(); if(n===3) loadCloud(); }
-$('t1').onclick=()=>showTab(1);
-$('t2').onclick=()=>showTab(2);
-$('t3').onclick=()=>showTab(3);
-function localList(){ try{ return JSON.parse(localStorage.getItem('memos')||'[]'); }catch(e){ return []; } }
-function localSave(list){ localStorage.setItem('memos', JSON.stringify(list)); }
+function autosave(){
+  const title=$('title').value;
+  const body=$('body').value;
+  let list=load();
+  const i=list.findIndex(n=>n.id===current);
+  const note={id:current,title,body,t:Date.now()};
+  if(i>=0) list[i]=note; else if(title||body) list.push(note);
+  list=list.filter(n=>n.title||n.body);
+  saveAll(list);
+  draw();
+  if(title||body) say('保存しました');
+}
 function openNote(n){
-  showTab(2);
-  $('ntitle').value=n.title||'';
-  $('nbody').value=n.body||'';
-  $('nowopen').textContent='開いている: '+(n.title||'無題');
-  say('開きました: '+(n.title||'無題'));
+  current=n.id;
+  $('title').value=n.title||'';
+  $('body').value=n.body||'';
+  say('開きました');
   window.scrollTo(0,0);
 }
-function renderLocal(){
-  const list=localList().sort((a,b)=>b.id-a.id);
-  $('nlist').innerHTML=list.length?'':'<p class="warn">まだありません</p>';
+function draw(){
+  const list=load().sort((a,b)=>b.t-a.t);
+  $('list').innerHTML='';
   list.forEach(n=>{
-    const d=document.createElement('div'); d.className='item';
+    const d=document.createElement('div');
+    d.className='item';
     const b=document.createElement('b'); b.textContent=n.title||'無題';
-    const s=document.createElement('small'); s.textContent=(n.body||'').slice(0,80);
-    const row=document.createElement('div'); row.className='row';
-    const o=document.createElement('button'); o.textContent='開く'; o.onclick=e=>{ e.stopPropagation(); openNote(n); };
-    const rm=document.createElement('button'); rm.textContent='消す'; rm.onclick=e=>{ e.stopPropagation(); const next=localList().filter(x=>x.id!==n.id); localSave(next); renderLocal(); };
+    const p=document.createElement('p'); p.textContent=n.body||'';
+    const del=document.createElement('button'); del.textContent='消す';
+    del.onclick=e=>{ e.stopPropagation(); saveAll(load().filter(x=>x.id!==n.id)); if(current===n.id){ current=Date.now(); $('title').value=''; $('body').value=''; } draw(); };
     d.onclick=()=>openNote(n);
-    row.appendChild(o); row.appendChild(rm);
-    d.appendChild(b); d.appendChild(s); d.appendChild(row);
-    $('nlist').appendChild(d);
+    d.appendChild(b); d.appendChild(p); d.appendChild(del);
+    $('list').appendChild(d);
   });
 }
-function renderCloud(list){
-  $('clist').innerHTML='';
-  if(!list.length){ $('clist').innerHTML='<p class="warn">クラウドにメモはまだありません</p>'; return; }
-  list.forEach(n=>{
-    const d=document.createElement('div'); d.className='item';
-    d.innerHTML='<b></b><small></small>';
-    d.querySelector('b').textContent=n.title||'無題';
-    d.querySelector('small').textContent=n.body||'';
-    d.onclick=()=>openNote(n);
-    $('clist').appendChild(d);
-  });
-}
-async function loadCloud(){
-  say('クラウドを読んでいます…');
-  try{
-    const res=await fetch(CLOUD+'?t='+Date.now());
-    const list=await res.json();
-    renderCloud(Array.isArray(list)?list:[]);
-    say('クラウド読み込み成功（'+ (Array.isArray(list)?list.length:0) +'件）');
-  }catch(e){ say('クラウドを読めませんでした'); }
-}
-$('creload').onclick=loadCloud;
-$('nnew').onclick=()=>{ $('ntitle').value=''; $('nbody').value=''; $('nowopen').textContent='新しいメモ'; say('新しいメモ'); };
-$('nsave').onclick=()=>{
-  const title=$('ntitle').value.trim();
-  const body=$('nbody').value;
-  if(!title&&!body){ say('題名か本文を書いてください'); return; }
-  const list=localList();
-  list.push({id:Date.now(), title:title||'無題', body});
-  localSave(list);
-  renderLocal();
-  say('成功：この手順に保存しました');
-};
-$('ncloud').onclick=()=>{
-  const title=$('ntitle').value.trim();
-  const body=$('nbody').value;
-  const local=localList();
-  const extra=(!title&&!body)?[]:[{id:Date.now(), title:title||'無題', body}];
-  const all=local.concat(extra);
-  const blob=new Blob([JSON.stringify(all,null,2)],{type:'application/json'});
-  if(ready) URL.revokeObjectURL(ready);
-  ready=URL.createObjectURL(blob);
-  const a=$('dl'); a.href=ready; a.download='cloud-notes.json'; a.style.display='block'; a.textContent='⬇️ cloud-notes.json を保存';
-  say('成功：クラウド用ファイルを作りました。下の緑ボタンで保存し、GitHubの cloud-notes.json に上書きしてください。');
-};
-$('zdrop').onclick=()=>$('zin').click();
-$('zin').onchange=()=>{ zfiles=[...$('zin').files]; $('zlist').textContent=zfiles.map(f=>f.name).join(', '); $('zbtn').disabled=!zfiles.length; };
-$('zbtn').onclick=async()=>{ try{ const zip=new JSZip(); zfiles.forEach(f=>zip.file(f.name,f)); const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'}); if(ready) URL.revokeObjectURL(ready); ready=URL.createObjectURL(blob); const a=$('dl'); a.href=ready; a.download='compressed.zip'; a.style.display='block'; a.textContent='⬇️ compressed.zip'; say('成功：ZIPを作りました'); }catch(e){ say(String(e)); } };
-renderLocal();
+$('title').oninput=autosave;
+$('body').oninput=autosave;
+$('newbtn').onclick=()=>{ current=Date.now(); $('title').value=''; $('body').value=''; say('新しいメモ'); window.scrollTo(0,0); };
+draw();
 </script>
 </body>
 </html>
